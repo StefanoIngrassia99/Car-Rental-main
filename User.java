@@ -1,5 +1,3 @@
-import databasehandler.DBHandler;
-//OGGETTO USER
 class User{
     private String name=null;
     private int ID=0;
@@ -9,7 +7,6 @@ class User{
         this.name=n;
         this.ID+=1;
         this.abbonato=false;
-        DBHandler.InsertUser(n, this.abbonato);
     }
     public boolean Isabbonato(){
         return abbonato;
@@ -44,5 +41,3 @@ class User{
         return this.GetName().hashCode();
     }
 }
-
-

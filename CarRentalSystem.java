@@ -4,17 +4,25 @@ public class CarRentalSystem {
     private static CarRentalSystem instance;
     private HashMap<String, Parking> posti;
     private RentalList activerental;
+    private Map<String, CarFactory> carFactories;
     private double euroxora=5.0;
     private double euroxkm=0.5;
 
     private CarRentalSystem(){
         this.posti=new HashMap<>();
         this.activerental=new RentalList();
+        this.carFactories=new HashMap<>();
+        this.carFactories.put("suv", new SuvFactory());
+        this.carFactories.put("stationwagon", new StationWagonFactory());
     }
     public static synchronized CarRentalSystem GetIstance(){
         if(instance==null){
             instance=new CarRentalSystem();
         }return instance;
+    }
+
+    public void registerCarFactory(String tipo, CarFactory factory) {
+        this.carFactories.put(tipo.toLowerCase(), factory);
     }
 
     //AZIONI AMMINISTRAZIONE
@@ -26,14 +34,9 @@ public class CarRentalSystem {
 
     public void AddNewCar(String t, String m, String tipo, String Parkingname){
         if(posti.containsKey(Parkingname)){
-            CarFactory factory; // Dichiariamo l'interfaccia astratta
-
-            // 1. Scegliamo la Factory CONCRETA giusta in base al tipo
-            if (tipo != null && tipo.equalsIgnoreCase("suv")) {
-                factory = new SuvFactory();
-            } else {
-                factory = new StationWagonFactory(); // Default
-            }
+            // Risolto OCP: Selezione dinamica della factory tramite Map
+            String tipoKey = (tipo != null) ? tipo.toLowerCase() : "";
+            CarFactory factory = carFactories.getOrDefault(tipoKey, new StationWagonFactory());
 
             // 2. Chiamiamo il metodo polimorfico (il sistema non sa che classe esatta sta creando)
             Car car = factory.createCar(t, m);
@@ -42,8 +45,6 @@ public class CarRentalSystem {
             
             // Aggiorno il DB
             DBHandler.InsertCar(t, m, Parkingname);
-
-            System.out.println("Aggiunta la macchina " + t + " " + m + " di tipo " + car.GetTipoAuto());
 
             System.out.println("Aggiunta la macchina " + t + " " + m + " di tipo " + car.GetTipoAuto());
         }
@@ -61,11 +62,15 @@ public class CarRentalSystem {
             }
         }
         if(carmove!=null){
-            part.removeCar(carmove);
-            arr.AddCar(carmove);
-            //Aggiorno il DB
-            DBHandler.MoveCar(t, arrivo);
-            System.out.println("Spostata la macchina "+carmove.GetTarga()+" "+carmove.GetModello()+" dal parcheggio "+part+" al parcheggio "+arr);
+            try {
+                part.removeCar(carmove);
+                arr.AddCar(carmove);
+                //Aggiorno il DB
+                DBHandler.MoveCar(t, arrivo);
+                System.out.println("Spostata la macchina "+carmove.GetTarga()+" "+carmove.GetModello()+" dal parcheggio "+part+" al parcheggio "+arr);
+            } catch (CarsNotFoundException e) {
+                System.err.println(e.getMessage());
+            }
         }
     }
 
@@ -115,13 +120,16 @@ public class CarRentalSystem {
     public void Coda(Parking posto, int hours){
         if(!posto.GetListcars().isEmpty() && !posto.GetQueueUsers().isEmpty()){
             User u=posto.GetQueueUsers().poll();
-            Car c=posto.GetAviableCar();
-
-            Rental r=new Rental(u, c, hours);
-            activerental.AddRental(r);
-            //Aggiorno il DB
-            DBHandler.InsertRental(u.GetName(), c.GetTarga(), hours);
-            System.out.println("Noleggio avviato all'utente "+u.GetName()+" con la mnacchina "+c.GetTarga());
+            try {
+                Car c=posto.GetAviableCar();
+                Rental r=new Rental(u, c, hours);
+                activerental.AddRental(r);
+                //Aggiorno il DB
+                DBHandler.InsertRental(u.GetName(), c.GetTarga(), hours);
+                System.out.println("Noleggio avviato all'utente "+u.GetName()+" con la mnacchina "+c.GetTarga());
+            } catch (CarsNotFoundException e) {
+                System.err.println(e.getMessage());
+            }
         }else{
             System.out.println("Non ci sono macchine disponibili al momento.");
         }

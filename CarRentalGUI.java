@@ -1,6 +1,5 @@
 import databasehandler.DBHandler;
 import java.awt.*;
-import java.sql.*;
 import java.util.*;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
@@ -17,8 +16,9 @@ public class CarRentalGUI extends JFrame {
     private Map<String, SystemPayment> userWallets;
 
     public CarRentalGUI() {
-        // 1. Inizializzazione Sistema
         DBHandler.ConnectAndInitialize();
+        
+        // 1. Inizializzazione Sistema
         system = CarRentalSystem.GetIstance();
 
         // 2. Setup Finestra
@@ -140,7 +140,7 @@ public class CarRentalGUI extends JFrame {
                 DBHandler.InsertUser(nome, isAbbonato);
                 
                 log("Utente registrato: " + nome + (isAbbonato ? " (Abbonato)" : ""));
-                refreshTable("USER");
+                refreshTable("UTENTE");
                 refreshUserCombo();
                 
                 // Pulisce i campi
@@ -173,7 +173,7 @@ public class CarRentalGUI extends JFrame {
                 boolean isAbbonato = updateSubCheck.isSelected();
                 updateUserSubscription(nome, isAbbonato);
                 log("Abbonamento aggiornato per " + nome + ": " + (isAbbonato ? "Sì" : "No"));
-                refreshTable("USER");
+                refreshTable("UTENTE");
             }
         });
         
@@ -371,47 +371,13 @@ public class CarRentalGUI extends JFrame {
 
     // Funzione magica per caricare i dati dal DB alla JTable
     private void refreshTable(String tableName) {
-        try (Connection conn = DriverManager.getConnection("jdbc:sqlite:carsharing.db");
-             Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery("SELECT * FROM " + tableName)) {
-
-            ResultSetMetaData meta = rs.getMetaData();
-            int colCount = meta.getColumnCount();
-
-            Vector<String> columnNames = new Vector<>();
-            // Aggiungi nomi colonne
-            for (int i = 1; i <= colCount; i++) {
-                columnNames.add(meta.getColumnName(i));
-            }
-
-            Vector<Vector<Object>> data = new Vector<>();
-            // Aggiungi righe
-            while (rs.next()) {
-                Vector<Object> row = new Vector<>();
-                for (int i = 1; i <= colCount; i++) {
-                    row.add(rs.getObject(i));
-                }
-                data.add(row);
-            }
-            
-            tableModel.setDataVector(data, columnNames);
-        } catch (SQLException e) {
-            log("Errore lettura DB: " + e.getMessage());
-        }
+        Vector<String> columnNames = new Vector<>();
+        Vector<Vector<Object>> data = DBHandler.GetTableData(tableName, columnNames);
+        tableModel.setDataVector(data, columnNames);
     }
 
     private void refreshUserCombo() {
-        Vector<String> users = new Vector<>();
-        try (Connection conn = DriverManager.getConnection("jdbc:sqlite:carsharing.db");
-             Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery("SELECT DISTINCT NOME FROM USER")) {
-            while (rs.next()) {
-                users.add(rs.getString("NOME"));
-            }
-        } catch (SQLException e) {
-            log("Errore aggiornamento utenti: " + e.getMessage());
-        }
-        
+        Vector<String> users = DBHandler.GetAllUserNames();
         userBookBox.setModel(new DefaultComboBoxModel<>(users));
         userRetBox.setModel(new DefaultComboBoxModel<>(users));
         adminUserBox.setModel(new DefaultComboBoxModel<>(users));
@@ -419,39 +385,14 @@ public class CarRentalGUI extends JFrame {
     }
 
     private boolean userExists(String name) {
-        try (Connection conn = DriverManager.getConnection("jdbc:sqlite:carsharing.db");
-             PreparedStatement pstmt = conn.prepareStatement("SELECT 1 FROM USER WHERE NOME = ?")) {
-            pstmt.setString(1, name);
-            try (ResultSet rs = pstmt.executeQuery()) {
-                return rs.next();
-            }
-        } catch (SQLException e) {
-            log("Errore verifica esistenza utente: " + e.getMessage());
-            return false;
-        }
+        return DBHandler.UserExists(name);
     }
 
     private void updateUserSubscription(String name, boolean isAbbonato) {
-        try (Connection conn = DriverManager.getConnection("jdbc:sqlite:carsharing.db");
-             PreparedStatement pstmt = conn.prepareStatement("UPDATE USER SET ABBONATO = ? WHERE NOME = ?")) {
-            pstmt.setBoolean(1, isAbbonato);
-            pstmt.setString(2, name);
-            pstmt.executeUpdate();
-        } catch (SQLException e) {
-            log("Errore aggiornamento abbonamento: " + e.getMessage());
-        }
+        DBHandler.UpdateUserSubscription(name, isAbbonato);
     }
 
     private boolean isUserAbbonato(String name) {
-        try (Connection conn = DriverManager.getConnection("jdbc:sqlite:carsharing.db");
-             PreparedStatement pstmt = conn.prepareStatement("SELECT ABBONATO FROM USER WHERE NOME = ?")) {
-            pstmt.setString(1, name);
-            try (ResultSet rs = pstmt.executeQuery()) {
-                if (rs.next()) return rs.getBoolean("ABBONATO");
-            }
-        } catch (SQLException e) {
-            log("Errore verifica abbonamento: " + e.getMessage());
-        }
-        return false;
+        return DBHandler.IsUserAbbonato(name);
     }
 }

@@ -13,26 +13,17 @@ public class Parking{
     public void AddCar(Car c){
         cars.add(c);
     }
-    public void removeCar(Car c){                   //METODO CHE CONTROLLA LA DISPONIBILITA DI MACCHINE NELLA LISTA, GESTITA TRAMITE ECCEZIONE
-        try{
+    public void removeCar(Car c) throws CarsNotFoundException {
         if(cars.isEmpty()){
             throw new CarsNotFoundException();          //ECCEZIONE CREATA
         }
         cars.remove(c);
-    }catch(CarsNotFoundException exc){
-        System.err.println(exc.toString());             //MESSAGGIO ECCEZIONE
     }
-    }
-    public Car GetAviableCar(){
-        try{
+    public Car GetAviableCar() throws CarsNotFoundException {
         if(cars.isEmpty()){
             throw new CarsNotFoundException();
         }
         return cars.remove(0);
-    }catch(CarsNotFoundException exc){
-        System.err.println(exc.toString());
-    }
-    return null;
     }
     public void AddReservation(User u){
         reservations.add(u);

@@ -1,6 +1,7 @@
 package databasehandler;
 
 import java.sql.*;
+import java.util.Vector;
 
 public class DBHandler {
     private static final String protocol = "jdbc:sqlite:carsharing.db";
@@ -20,7 +21,7 @@ public class DBHandler {
     private static void CreateTable(Connection c) throws SQLException {
         Statement stmt = c.createStatement();
 
-        String sqlUser = "CREATE TABLE IF NOT EXISTS USER ("
+        String sqlUser = "CREATE TABLE IF NOT EXISTS UTENTE ("
                 + "ID INTEGER PRIMARY KEY AUTOINCREMENT, "
                 + "NOME TEXT NOT NULL, "
                 + "ABBONATO BOOLEAN DEFAULT 0"
@@ -48,7 +49,7 @@ public class DBHandler {
                 + "INIZIO BIGINT, "
                 + "DURATA_ORE INTEGER, "
                 + "ATTIVO BOOLEAN, "
-                + "FOREIGN KEY (CLIENTE) REFERENCES USER(NOME), "
+                + "FOREIGN KEY (CLIENTE) REFERENCES UTENTE(NOME), "
                 + "FOREIGN KEY (TARGA_AUTO) REFERENCES AUTO(TARGA)"
                 + ");";
         stmt.execute(sqlRental);
@@ -59,7 +60,7 @@ public class DBHandler {
                 + "CODICE TEXT NOT NULL, "
                 + "IMPORTO DOUBLE NOT NULL, "
                 + "EFFETTUATO_DA TEXT, "
-                + "FOREIGN KEY (EFFETTUATO_DA) REFERENCES USER(NOME)"
+                + "FOREIGN KEY (EFFETTUATO_DA) REFERENCES UTENTE(NOME)"
                 + ");";
         stmt.execute(sqlPayment);
 
@@ -200,7 +201,7 @@ public class DBHandler {
     // --- METODI STANDARD ---
 
     public static void InsertUser(String n, Boolean a) {
-        String sql = "INSERT INTO USER(NOME, ABBONATO) VALUES(?,?)";
+        String sql = "INSERT INTO UTENTE(NOME, ABBONATO) VALUES(?,?)";
         try (Connection connect = DriverManager.getConnection(protocol)) {
             PreparedStatement stmt = connect.prepareStatement(sql);
             stmt.setString(1, n);
@@ -239,7 +240,7 @@ public class DBHandler {
     // UTILITY PER VEDERE IL DB
     public static void ShowDatabase() {
         System.out.println("\n--- CONTENUTO DATABASE ---");
-        String[] tables = { "PARCHEGGIO", "AUTO", "USER", "NOLEGGI", "PAGAMENTI" };
+        String[] tables = { "PARCHEGGIO", "AUTO", "UTENTE", "NOLEGGI", "PAGAMENTI" };
 
         try (Connection connect = DriverManager.getConnection(protocol)) {
             Statement stmt = connect.createStatement();
@@ -270,7 +271,7 @@ public class DBHandler {
 
     public static void ClearDatabase() {
         System.out.println("--- PULIZIA DB ---");
-        String[] tables = { "PAGAMENTI", "NOLEGGI", "AUTO", "USER", "PARCHEGGIO" };
+        String[] tables = { "PAGAMENTI", "NOLEGGI", "AUTO", "UTENTE", "PARCHEGGIO" };
         try (Connection connect = DriverManager.getConnection(protocol)) {
             Statement stmt = connect.createStatement();
             stmt.execute("PRAGMA foreign_keys = OFF;");
@@ -282,5 +283,60 @@ public class DBHandler {
         } catch (SQLException e) {
             System.err.println(e.getMessage());
         }
+    }
+
+    // --- METODI INTERROGAZIONE PER LA GUI ---
+
+    public static Vector<Vector<Object>> GetTableData(String tableName, Vector<String> columnNames) {
+        Vector<Vector<Object>> data = new Vector<>();
+        try (Connection connect = DriverManager.getConnection(protocol);
+             Statement stmt = connect.createStatement();
+             ResultSet rs = stmt.executeQuery("SELECT * FROM " + tableName)) {
+            ResultSetMetaData meta = rs.getMetaData();
+            int colCount = meta.getColumnCount();
+            for (int i = 1; i <= colCount; i++) columnNames.add(meta.getColumnName(i));
+            while (rs.next()) {
+                Vector<Object> row = new Vector<>();
+                for (int i = 1; i <= colCount; i++) row.add(rs.getObject(i));
+                data.add(row);
+            }
+        } catch (SQLException e) { System.err.println(e.getMessage()); }
+        return data;
+    }
+
+    public static Vector<String> GetAllUserNames() {
+        Vector<String> users = new Vector<>();
+        try (Connection connect = DriverManager.getConnection(protocol);
+             Statement stmt = connect.createStatement();
+             ResultSet rs = stmt.executeQuery("SELECT DISTINCT NOME FROM UTENTE")) {
+            while (rs.next()) users.add(rs.getString("NOME"));
+        } catch (SQLException e) { System.err.println(e.getMessage()); }
+        return users;
+    }
+
+    public static boolean UserExists(String name) {
+        try (Connection connect = DriverManager.getConnection(protocol);
+             PreparedStatement pstmt = connect.prepareStatement("SELECT 1 FROM UTENTE WHERE NOME = ?")) {
+            pstmt.setString(1, name);
+            try (ResultSet rs = pstmt.executeQuery()) { return rs.next(); }
+        } catch (SQLException e) { return false; }
+    }
+
+    public static void UpdateUserSubscription(String name, boolean isAbbonato) {
+        try (Connection connect = DriverManager.getConnection(protocol);
+             PreparedStatement pstmt = connect.prepareStatement("UPDATE UTENTE SET ABBONATO = ? WHERE NOME = ?")) {
+            pstmt.setBoolean(1, isAbbonato);
+            pstmt.setString(2, name);
+            pstmt.executeUpdate();
+        } catch (SQLException e) { System.err.println(e.getMessage()); }
+    }
+
+    public static boolean IsUserAbbonato(String name) {
+        try (Connection connect = DriverManager.getConnection(protocol);
+             PreparedStatement pstmt = connect.prepareStatement("SELECT ABBONATO FROM UTENTE WHERE NOME = ?")) {
+            pstmt.setString(1, name);
+            try (ResultSet rs = pstmt.executeQuery()) { if (rs.next()) return rs.getBoolean("ABBONATO"); }
+        } catch (SQLException e) { System.err.println(e.getMessage()); }
+        return false;
     }
 }
